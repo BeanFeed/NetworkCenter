@@ -1,4 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NetworkCenter.Websocket;
+using NetworkCenter.Websocket.Services;
 
 namespace NetworkCenter;
 
@@ -11,6 +14,12 @@ class Program
     static void Main(string[] args)
     {
         GetConfiguration();
+        
+        SocketServerManager server = new SocketServerManager(Configuration);
+
+        server.Services.AddScoped<AuthService>();
+        
+        server.Start();
     }
     
     private static void GetConfiguration()

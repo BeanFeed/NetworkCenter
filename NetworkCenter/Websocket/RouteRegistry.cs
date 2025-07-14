@@ -1,16 +1,17 @@
 using System.Diagnostics;
 using System.Reflection;
 using Fleck;
+using Microsoft.Extensions.DependencyInjection;
 using NetworkCenter.Websocket.Attributes;
 using NetworkCenter.Websocket.Models;
 
 namespace NetworkCenter.Websocket;
 
-public static class RouteRegistry
+public class RouteRegistry(SocketServerManager server)
 {
-    public static readonly Dictionary<string, MethodInfo> Routes = new Dictionary<string, MethodInfo>();
+    public readonly Dictionary<string, MethodInfo> Routes = new Dictionary<string, MethodInfo>();
 
-    public static void Map()
+    public void Map()
     {
         var controllers = Assembly.GetExecutingAssembly().GetTypes().Where(x => x.IsClass && x.IsSubclassOf(typeof(ControllerBase)) && x.GetCustomAttribute(typeof(ControllerAttribute)) != null).ToList();
 
@@ -18,11 +19,15 @@ public static class RouteRegistry
         {
             string controllerName = controller.Name.Replace("Controller", "");
             
-            var methods = controller.GetMethods(BindingFlags.Public)
-                .Where(m => m.GetCustomAttribute(typeof(RouteAttribute)) != null).ToList();
+            var methods = controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+                .Where(m => m.GetCustomAttribute<RouteAttribute>(false) != null)
+                .ToList();
+
+            server.Services.AddTransient(controller);
 
             foreach (var method in methods)
             {
+                
                 string path;
 
                 if (method.GetCustomAttribute<RouteAttribute>(false)!.Path == null)

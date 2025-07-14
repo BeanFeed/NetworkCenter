@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkCenter", "NetworkCenter\NetworkCenter.csproj", "{A329AC1C-A3FA-433C-8A71-93D62F7F8FA9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DAL", "DAL\DAL.csproj", "{F3C43D97-D116-405D-A3FD-C58B539FB3FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{A329AC1C-A3FA-433C-8A71-93D62F7F8FA9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A329AC1C-A3FA-433C-8A71-93D62F7F8FA9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A329AC1C-A3FA-433C-8A71-93D62F7F8FA9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3C43D97-D116-405D-A3FD-C58B539FB3FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3C43D97-D116-405D-A3FD-C58B539FB3FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3C43D97-D116-405D-A3FD-C58B539FB3FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3C43D97-D116-405D-A3FD-C58B539FB3FE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
