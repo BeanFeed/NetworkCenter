@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using DAL.Context;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NetworkCenter.Websocket;
 using NetworkCenter.Websocket.Services;
@@ -16,7 +17,8 @@ class Program
         GetConfiguration();
         
         SocketServerManager server = new SocketServerManager(Configuration);
-
+        
+        server.Services.AddDbContext<NetworkContext>();
         server.Services.AddScoped<AuthService>();
         
         server.Start();
