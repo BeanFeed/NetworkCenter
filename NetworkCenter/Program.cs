@@ -16,6 +16,16 @@ class Program
     {
         GetConfiguration();
         
+        if (!Directory.Exists(Path.Join(Environment.CurrentDirectory, "data")))
+        {
+            Directory.CreateDirectory(Path.Join(Environment.CurrentDirectory, "data"));
+        }
+        
+        if (!File.Exists(Path.Join(Environment.CurrentDirectory, "data", "networkdata.db")))
+        {
+            File.Create(Path.Join(Environment.CurrentDirectory, "data", "networkdata.db")).Close();
+        }
+        
         SocketServerManager server = new SocketServerManager(Configuration);
         
         server.Services.AddDbContext<NetworkContext>();
