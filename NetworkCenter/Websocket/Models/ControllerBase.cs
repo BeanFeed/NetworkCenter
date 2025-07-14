@@ -1,6 +1,6 @@
 namespace NetworkCenter.Websocket.Models;
 
-public abstract class RequestBase(ClientConnection client)
+public abstract class ControllerBase(ClientConnection client)
 {
     protected ClientConnection Client => client;
 }

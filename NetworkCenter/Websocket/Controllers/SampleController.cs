@@ -4,7 +4,7 @@ using NetworkCenter.Websocket.Models;
 namespace NetworkCenter.Websocket.Controllers;
 
 [Controller]
-public class SampleController(ClientConnection client) : RequestBase(client)
+public class SampleController(ClientConnection client) : ControllerBase(client)
 {
     
     [Route("sample/echo")]
