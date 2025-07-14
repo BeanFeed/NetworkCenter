@@ -6,7 +6,7 @@ namespace NetworkCenter.Websocket.Services;
 
 public class AuthService
 {
-    public bool Authenticate(AuthModel auth, ClientConnection client)
+    public async Task<bool> Authenticate(AuthModel auth, ClientConnection client)
     {
         if (string.IsNullOrEmpty(auth.Name) || string.IsNullOrEmpty(auth.ConnectionType) || string.IsNullOrEmpty(auth.Key))
         {

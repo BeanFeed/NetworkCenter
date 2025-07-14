@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
+using DAL.Context;
 using Fleck;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NetworkCenter.Websocket.Attributes;
@@ -43,12 +46,16 @@ public class SocketServerManager
             };
             socket.OnMessage = message =>
             {
-                HandleRequest(socket, message);
+                _ = HandleRequest(socket, message);
             };
         });
         
         _serviceProvider = Services.BuildServiceProvider();
-        Console.ReadKey();
+
+        var context = _serviceProvider.GetService<NetworkContext>();
+        context!.Database.Migrate();
+
+        Task.Delay(-1).Wait();
     }
 
     public void Stop()
@@ -63,7 +70,7 @@ public class SocketServerManager
 
     public IReadOnlyList<IWebSocketConnection> Connections => _connections.AsReadOnly();
     
-    private void HandleRequest(IWebSocketConnection socket, string message)
+    private async Task HandleRequest(IWebSocketConnection socket, string message)
     {
         JsonElement data = JsonSerializer.Deserialize<JsonElement>(message);
         if (data.TryGetProperty("path", out var id))
@@ -72,12 +79,12 @@ public class SocketServerManager
             bool routeExists = _routeRegistry.Routes.TryGetValue(path, out var route);
             if (!routeExists)
             {
-                socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
+                await socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
             }
             Debug.Assert(route != null);
             if ((route.GetCustomAttribute<AuthenticateAttribute>(false) != null || route.DeclaringType.GetCustomAttribute<AuthenticateAttribute>() != null) && !ConnectionRegistry.Connections.Exists(x => x.Connection == socket && x is { Type: not null, Key: not null, Name: not null }))
             {
-                socket.Send(JsonSerializer.Serialize(new { status = "error", error = "You are not authenticated to the server." }));
+                await socket.Send(JsonSerializer.Serialize(new { status = "error", error = "You are not authenticated to the server." }));
                 return;
             }
 
@@ -91,7 +98,7 @@ public class SocketServerManager
                 
                 if (controller == null)
                 {
-                    socket.Send(JsonSerializer.Serialize(new { error = "Controller instance could not be created." }));
+                    await socket.Send(JsonSerializer.Serialize(new { error = "Controller instance could not be created." }));
                     return;
                 }
                 
@@ -130,25 +137,42 @@ public class SocketServerManager
                         WriteIndented = true,
                         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                     };
-                    if (result != null)
+                    if (result is Task task)
                     {
-                        socket.Send(JsonSerializer.Serialize(new { status = "success", data = result }, serializeOptions));
+                        await task.ConfigureAwait(false);
+                        var taskType = task.GetType();
+                        if (taskType.IsGenericType)
+                        {
+                            var returnValue = taskType.GetProperty("Result")!.GetValue(task);
+                            await socket.Send(JsonSerializer.Serialize(new { status = "success", data = returnValue }, serializeOptions));
+                        }
+                        else
+                        {
+                            await socket.Send(JsonSerializer.Serialize(new { status = "success" }, serializeOptions));
+                        }
+                    }
+                    else
+                    {
+                        if (result != null)
+                        {
+                            await socket.Send(JsonSerializer.Serialize(new { status = "success", data = result }, serializeOptions));
+                        }
                     }
                 }
                 catch (Exception e)
                 {
-                    socket.Send(JsonSerializer.Serialize(new { status = "error", error = e.InnerException.Message }));
+                    await socket.Send(JsonSerializer.Serialize(new { status = "error", error = e.InnerException.Message }));
                 }
                 
             }
             catch (Exception ex)
             {
-                socket.Send(JsonSerializer.Serialize(new { error = ex.Message }));
+                await socket.Send(JsonSerializer.Serialize(new { error = ex.Message }));
             }
         }
         else
         {
-            socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
+            await socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
         }
     }
 }

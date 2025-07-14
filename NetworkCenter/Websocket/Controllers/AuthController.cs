@@ -9,9 +9,9 @@ namespace NetworkCenter.Websocket.Controllers;
 public class AuthController(AuthService authService) : ControllerBase
 {
     [Route]
-    public bool Authenticate(AuthModel auth)
+    public async Task<bool> Authenticate(AuthModel auth)
     {
-        return authService.Authenticate(auth, Client);
+        return await authService.Authenticate(auth, Client);
     }
 
     [Route]
