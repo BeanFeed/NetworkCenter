@@ -1,0 +1,56 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "production" ]
+    paths:
+      - 'NetworkCenter/**'
+      - 'DAL/**'
+  pull_request:
+    branches: [ "production" ]
+    paths:
+      - 'NetworkCenter/**'
+      - 'DAL/**'
+  
+  workflow_dispatch:
+
+jobs:
+
+  build:
+
+    runs-on: networkcenter-runner
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Login to Registry
+      run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login registry.beanfeed.com -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+
+    - name: Set image tags
+      id: vars
+      run: |
+        TAG_DATE=$(date +%Y.%m.%d-%H.%M)
+        echo "TAG_DATE=$TAG_DATE" >> $GITHUB_ENV
+        echo "FULL_TAG=registry.beanfeed.com/networkcenter/networkcenter:$TAG_DATE" >> $GITHUB_ENV
+        echo "LATEST_TAG=registry.beanfeed.com/networkcenter/networkcenter:latest" >> $GITHUB_ENV
+
+    - name: Delete old latest
+      run: |
+        IMAGE_ID=$(docker images -q ${{ env.LATEST_TAG }})
+        if [ -n "$IMAGE_ID" ]; then
+          docker rmi ${{ env.LATEST_TAG }}
+        else
+          echo "Image ${{ env.LATEST_TAG }} not found. Skipping."
+        fi
+    
+    - name: Build the Docker image
+      run: docker build . --file NetworkCenter/Dockerfile --tag ${{ env.LATEST_TAG }} --tag ${{ env.FULL_TAG }}
+
+    - name: Push to Registry
+      run: |
+        docker push ${{ env.LATEST_TAG}}
+        docker push ${{ env.FULL_TAG }}
+
+    - name: Cleanup Image
+      run: |
+        docker rmi ${{ env.FULL_TAG }}
