@@ -38,7 +38,7 @@ jobs:
       run: |
         IMAGE_ID=$(docker images -q ${{ env.LATEST_TAG }})
         if [ -n "$IMAGE_ID" ]; then
-          docker rmi ${{ env.LATEST_TAG }}
+          docker rmi ${{ env.LATEST_TAG }} --force
         else
           echo "Image ${{ env.LATEST_TAG }} not found. Skipping."
         fi
