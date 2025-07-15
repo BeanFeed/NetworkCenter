@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NetworkCenter.Websocket.Attributes;
+using NetworkCenter.Websocket.Enums;
 using NetworkCenter.Websocket.Models;
 
 namespace NetworkCenter.Websocket;
@@ -82,33 +83,31 @@ public class SocketServerManager
                 await socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
             }
             Debug.Assert(route != null);
+            /*
             if ((route.GetCustomAttribute<AuthenticateAttribute>(false) != null || route.DeclaringType.GetCustomAttribute<AuthenticateAttribute>() != null) && !ConnectionRegistry.Connections.Exists(x => x.Connection == socket && x is { Type: not null, Key: not null, Name: not null }))
             {
                 await socket.Send(JsonSerializer.Serialize(new { status = "error", error = "You are not authenticated to the server." }));
                 return;
             }
-
+            */
             try
             {
                 var controllerType = route.DeclaringType!;
                 
 
                 //Get the controller instance from the service provider
-                var controller = _serviceProvider.GetService(controllerType);
+                var controller = (ControllerBase?)_serviceProvider.GetService(controllerType);
                 
                 if (controller == null)
                 {
                     await socket.Send(JsonSerializer.Serialize(new { error = "Controller instance could not be created." }));
                     return;
                 }
-                
+
                 // Invoke the SetClient method
-                if (controller is ControllerBase controllerBase)
-                {
-                    var connection = ConnectionRegistry.Connections.FirstOrDefault(x => x.Connection == socket);
-                    if (connection == null) connection = new ClientConnection(socket, null, null, null);
-                    controllerBase.SetClient(connection);
-                }
+                var connection = ConnectionRegistry.Connections.FirstOrDefault(x => x.Connection == socket);
+                if (connection == null) connection = new ClientConnection(socket, null, null, null);
+                controller.SetClient(connection);
                 
 
                 var parameters = route.GetParameters();
@@ -128,51 +127,82 @@ public class SocketServerManager
                         args[i] = null; // or handle missing parameters as needed
                     }
                 }
+                
+                ActionContext context = new ActionContext(controller, connection, args);
+                
+                var actionFilters = controllerType.GetCustomAttributes<ActionFilterAttribute>(true).ToList();
 
-                try
+                var serializeOptions = new JsonSerializerOptions
                 {
-                    var result = route.Invoke(controller, args);
-                    var serializeOptions = new JsonSerializerOptions
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                };
+                
+                foreach (var filter in actionFilters)
+                {
+                    filter.BeforeExecute(context);
+                    if (context.Status != null)
                     {
-                        WriteIndented = true,
-                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                    };
-                    if (result is Task task)
+                        await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                        return;
+                    }
+                }
+                
+                var result = route.Invoke(context.Controller, context.Arguments);
+                
+                if (result is Task task)
+                {
+                    await task.ConfigureAwait(false);
+                    var taskType = task.GetType();
+                    if (taskType.IsGenericType)
                     {
-                        await task.ConfigureAwait(false);
-                        var taskType = task.GetType();
-                        if (taskType.IsGenericType)
-                        {
-                            var returnValue = taskType.GetProperty("Result")!.GetValue(task);
-                            await socket.Send(JsonSerializer.Serialize(new { status = "success", data = returnValue }, serializeOptions));
-                        }
-                        else
-                        {
-                            await socket.Send(JsonSerializer.Serialize(new { status = "success" }, serializeOptions));
-                        }
+                        context.Result = taskType.GetProperty("Result")!.GetValue(task);
                     }
                     else
                     {
-                        if (result != null)
+                        context.Result = null;
+                    }
+                
+                    foreach (var filter in actionFilters)
+                    {
+                        filter.AfterExecute(context);
+                        if (context.Status != null)
                         {
-                            await socket.Send(JsonSerializer.Serialize(new { status = "success", data = result }, serializeOptions));
+                            await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                            return;
                         }
                     }
+                    
+                    context.Status ??= ActionStatus.Success;
+                    
+                    await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
                 }
-                catch (Exception e)
+                else
                 {
-                    await socket.Send(JsonSerializer.Serialize(new { status = "error", error = e.InnerException.Message }));
-                }
+                    if (result != null)
+                    {
+                        context.Result = result;
                 
+                        foreach (var filter in actionFilters)
+                        {
+                            filter.AfterExecute(context);
+                        }
+                        
+                        context.Status ??= ActionStatus.Success;
+
+                
+                        await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                    }
+                }
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                await socket.Send(JsonSerializer.Serialize(new { error = ex.Message }));
+                await socket.Send(JsonSerializer.Serialize(new { status = ActionStatus.Error.ToString()!.ToLower(), error = e.InnerException != null ? e.InnerException.Message : e.Message }));
             }
         }
         else
         {
-            await socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
+            await socket.Send(JsonSerializer.Serialize(new { status = ActionStatus.Error.ToString()!.ToLower(), error = "Invalid request format" }));
         }
     }
 }

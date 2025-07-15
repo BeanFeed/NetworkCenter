@@ -10,6 +10,8 @@ public class ClientConnection(IWebSocketConnection connection, ConnectionType? t
     public string? Name { get; private set; } = name;
     public string? Key { get; private set; } = key;
     
+    public string[] Scopes { get; set; } = [];
+    
     public void Authenticate(ConnectionType type, string name, string key)
     {
         if (Type != null && Name != null && Key != null)
