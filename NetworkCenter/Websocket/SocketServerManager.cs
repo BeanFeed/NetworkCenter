@@ -133,6 +133,7 @@ public class SocketServerManager
                 {
                     Path = path
                 };
+                controller.SetActionContext(context);
 
                 var actionFilters = controllerType.GetCustomAttributes<ActionFilterAttribute>(true).ToList();
                 actionFilters.AddRange(route.GetCustomAttributes<ActionFilterAttribute>(true).ToList());
