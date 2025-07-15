@@ -6,6 +6,7 @@ namespace NetworkCenter.Websocket.Models;
 public class ActionContext(ControllerBase controller, ClientConnection client, object?[] arguments)
 {
     public ActionStatus? Status { get; set; }
+    public string? Path { get; set; }
     public ControllerBase Controller { get; set; } = controller ?? throw new ArgumentNullException(nameof(controller));
     public object? Result { get; set; }
     public object?[] Arguments { get; set; } = arguments ?? throw new ArgumentNullException(nameof(arguments));
