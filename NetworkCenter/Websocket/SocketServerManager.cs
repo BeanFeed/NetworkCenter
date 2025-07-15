@@ -80,7 +80,8 @@ public class SocketServerManager
             bool routeExists = _routeRegistry.Routes.TryGetValue(path, out var route);
             if (!routeExists)
             {
-                await socket.Send(JsonSerializer.Serialize(new { error = "Invalid request format" }));
+                await socket.Send(JsonSerializer.Serialize(new { path, status = ActionStatus.Error.ToString().ToLower(), error = "Invalid request format" }));
+                return;
             }
             Debug.Assert(route != null);
             /*
@@ -100,7 +101,7 @@ public class SocketServerManager
                 
                 if (controller == null)
                 {
-                    await socket.Send(JsonSerializer.Serialize(new { error = "Controller instance could not be created." }));
+                    await socket.Send(JsonSerializer.Serialize(new { path, status = ActionStatus.Error.ToString().ToLower(), error = "Controller instance could not be created." }));
                     return;
                 }
 
@@ -128,10 +129,13 @@ public class SocketServerManager
                     }
                 }
                 
-                ActionContext context = new ActionContext(controller, connection, args);
-                
-                var actionFilters = controllerType.GetCustomAttributes<ActionFilterAttribute>(true).ToList();
+                ActionContext context = new ActionContext(controller, connection, args)
+                {
+                    Path = path
+                };
 
+                var actionFilters = controllerType.GetCustomAttributes<ActionFilterAttribute>(true).ToList();
+                actionFilters.AddRange(route.GetCustomAttributes<ActionFilterAttribute>(true).ToList());
                 var serializeOptions = new JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -143,7 +147,7 @@ public class SocketServerManager
                     filter.BeforeExecute(context);
                     if (context.Status != null)
                     {
-                        await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                        await socket.Send(JsonSerializer.Serialize(new { path = context.Path, status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
                         return;
                     }
                 }
@@ -168,14 +172,14 @@ public class SocketServerManager
                         filter.AfterExecute(context);
                         if (context.Status != null)
                         {
-                            await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                            await socket.Send(JsonSerializer.Serialize(new { path = context.Path, status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
                             return;
                         }
                     }
                     
                     context.Status ??= ActionStatus.Success;
                     
-                    await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                    await socket.Send(JsonSerializer.Serialize(new { path = context.Path, status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
                 }
                 else
                 {
@@ -191,13 +195,13 @@ public class SocketServerManager
                         context.Status ??= ActionStatus.Success;
 
                 
-                        await socket.Send(JsonSerializer.Serialize(new { status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
+                        await socket.Send(JsonSerializer.Serialize(new { path = context.Path, status = context.Status.ToString()!.ToLower(), data = context.Result }, serializeOptions));
                     }
                 }
             }
             catch (Exception e)
             {
-                await socket.Send(JsonSerializer.Serialize(new { status = ActionStatus.Error.ToString()!.ToLower(), error = e.InnerException != null ? e.InnerException.Message : e.Message }));
+                await socket.Send(JsonSerializer.Serialize(new { path, status = ActionStatus.Error.ToString()!.ToLower(), error = e.InnerException != null ? e.InnerException.Message : e.Message }));
             }
         }
         else
